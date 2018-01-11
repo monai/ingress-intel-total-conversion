@@ -232,11 +232,22 @@ window.plugin.regions.update = function() {
   // centre cell
   var zoom = map.getZoom();
   if (zoom >= 5) {
-    var cellSize = zoom>=7 ? 6 : 4;
+    var cellSize = 4;
+    if (zoom >= 7 && zoom < 16) {
+      cellSize = 7;
+    } else if (zoom >= 16) {
+      cellSize = 17;
+    }
+    // var cellSize = zoom>=7 ? 6 : 4;
     var cell = S2.S2Cell.FromLatLng ( map.getCenter(), cellSize );
 
     drawCellAndNeighbors(cell);
   }
+
+  // the six cube side boundaries. we cheat by hard-coding the coords as it's simple enough
+  var latLngs = [ [45,-180], [35.264389682754654,-135], [35.264389682754654,-45], [35.264389682754654,45], [35.264389682754654,135], [45,180]];
+
+  var globalCellOptions = {color: 'red', weight: 7, opacity: 0.5, clickable: false };
 
 
   // the six cube side boundaries. we cheat by hard-coding the coords as it's simple enough
@@ -263,8 +274,8 @@ window.plugin.regions.update = function() {
 }
 
 window.plugin.regions.drawCell = function(cell) {
-
-//TODO: move to function - then call for all cells on screen
+  //TODO: move to function - then call for all cells on screen
+  var zoom = map.getZoom();
 
   // corner points
   var corners = cell.getCornerLatLngs();
@@ -275,44 +286,48 @@ window.plugin.regions.drawCell = function(cell) {
   // name
   var name = window.plugin.regions.regionName(cell);
 
+  // weight
+  var weight = zoom < 16 ? 5 : 1;
 
   var color = cell.level == 6 ? 'gold' : 'orange';
 
   // the level 6 cells have noticible errors with non-geodesic lines - and the larger level 4 cells are worse
   // NOTE: we only draw two of the edges. as we draw all cells on screen, the other two edges will either be drawn
   // from the other cell, or be off screen so we don't care
-  var region = L.geodesicPolyline([corners[0],corners[1],corners[2]], {fill: false, color: color, opacity: 0.5, weight: 5, clickable: false });
+  var region = L.geodesicPolyline([corners[0],corners[1],corners[2]], {fill: false, color: color, opacity: 0.5, weight: weight, clickable: false });
 
   window.plugin.regions.regionLayer.addLayer(region);
 
-// move the label if we're at a high enough zoom level and it's off screen
-  if (map.getZoom() >= 9) {
-    var namebounds = map.getBounds().pad(-0.1); // pad 10% inside the screen bounds
-    if (!namebounds.contains(center)) {
-      // name is off-screen. pull it in so it's inside the bounds
-      var newlat = Math.max(Math.min(center.lat, namebounds.getNorth()), namebounds.getSouth());
-      var newlng = Math.max(Math.min(center.lng, namebounds.getEast()), namebounds.getWest());
+  // move the label if we're at a high enough zoom level and it's off screen
+  if (zoom < 16) {
+    if (zoom >= 9) {
+      var namebounds = map.getBounds().pad(-0.1); // pad 10% inside the screen bounds
+      if (!namebounds.contains(center)) {
+        // name is off-screen. pull it in so it's inside the bounds
+        var newlat = Math.max(Math.min(center.lat, namebounds.getNorth()), namebounds.getSouth());
+        var newlng = Math.max(Math.min(center.lng, namebounds.getEast()), namebounds.getWest());
 
-      var newpos = L.latLng(newlat,newlng);
+        var newpos = L.latLng(newlat,newlng);
 
-      // ensure the new position is still within the same cell
-      var newposcell = S2.S2Cell.FromLatLng ( newpos, 6 );
-      if ( newposcell.toString() == cell.toString() ) {
-        center=newpos;
+        // ensure the new position is still within the same cell
+        var newposcell = S2.S2Cell.FromLatLng ( newpos, 6 );
+        if ( newposcell.toString() == cell.toString() ) {
+          center=newpos;
+        }
+        // else we leave the name where it was - offscreen
       }
-      // else we leave the name where it was - offscreen
     }
-  }
 
-  var marker = L.marker(center, {
-    icon: L.divIcon({
-      className: 'plugin-regions-name',
-      iconAnchor: [100,5],
-      iconSize: [200,10],
-      html: name,
-    })
-  });
-  window.plugin.regions.regionLayer.addLayer(marker);
+    var marker = L.marker(center, {
+      icon: L.divIcon({
+        className: 'plugin-regions-name',
+        iconAnchor: [100,5],
+        iconSize: [200,10],
+        html: name,
+      })
+    });
+    window.plugin.regions.regionLayer.addLayer(marker);
+  }
 };
 
 var setup =  window.plugin.regions.setup;
